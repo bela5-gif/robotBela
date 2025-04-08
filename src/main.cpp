@@ -46,14 +46,20 @@ float wheelCircumference = 20.0;
 
 bool started = false;
 
+int kozeptavolsag;
+int balkozel;
+int jobbkozel;
+int kanyar;
 double tavolsagok[4];
 bool kozel = false;
+bool motorstopped = false;
+
 int maxS = 200;
 
 int pidmode = 2;
 double setpoint = 0; // PID célérték
 double input, output;
-double Pid_P = 20, Pid_I = 0.1, Pid_D = 5; // PID tényezők
+double Pid_P = 30, Pid_I = 0.2, Pid_D = 6; // PID tényezők
 PID pid(&input, &output, &setpoint, Pid_P, Pid_I, Pid_D, DIRECT);
 
 // RFID UID-k
@@ -191,12 +197,20 @@ void tolat() {
   analogWrite(ENB, -150);
 }
 
-void pidmozgas(double kozep, int maxS){
+void pidmozgas(int kozep, int maxS, int kanyar){
   input = kozep;
   pid.Compute();
+  if (kanyar == 1){
+    moveForward(maxS + 50, maxS - 50);
+  }
+  else if (kanyar == -1){
+    moveForward(maxS - 50, maxS + 50);
+  }
+  else {
   int motorleft = constrain(maxS - output, -50, 255);
   int motorright = constrain(maxS + output, -50, 255);
   moveForward(motorleft, motorright);
+  }
 }
 
 bool compareUID(byte *uid, byte *ref) {
@@ -224,8 +238,8 @@ double tavolsag(int sensor){
   if (tavolsagCM < 2){
     return 0;
   }
-  if (tavolsagCM > 45.0){
-    return 45;
+  if (tavolsagCM > 10){
+    return 10;
   }
   return tavolsagCM;
 }
@@ -235,17 +249,43 @@ void tavolsagmeres() {
   tavolsagok[1] = tavolsag(IR2);
   tavolsagok[2] = tavolsag(IR3);
   tavolsagok[3] = tavolsag(IR4);
-  if (tavolsagok[0] < 8 ) {
+  balkozel = (tavolsagok[2] - tavolsagok[3])/2;
+  jobbkozel = (tavolsagok[3] - tavolsagok[2])/2;
+  kozeptavolsag = balkozel - jobbkozel;
+  if (tavolsagok[0] < 4 ) {
     Serial.println("Fal érzékelve!");
-    tolat();
+    stopMotors();
+    delay(200);
+    if (balkozel < jobbkozel){
+      int kanyar = 1;
+      pidmozgas(kozeptavolsag, 200, kanyar);
+    }
+    else if (balkozel > jobbkozel){
+      int kanyar = -1;
+      pidmozgas(kozeptavolsag, 200, kanyar);
+    }
+    else {
+      int kanyar = 0;
+      pidmozgas(kozeptavolsag, 200, kanyar);
+    }
   }
-  else if(tavolsagok[1] < 8){
+  else if(tavolsagok[1] < 2){
     delay(200);
     stopMotors();
   }
   else {
-    pidmozgas(tavolsagok[0], 200);
+    if (balkozel < jobbkozel){
+      int kanyar = 1;
+      pidmozgas(kozeptavolsag, 200, kanyar);
+    }
+    else if (balkozel > jobbkozel){
+      int kanyar = -1;
+      pidmozgas(kozeptavolsag, 200, kanyar);
+    }
+    else {
+      int kanyar = 0;
+      pidmozgas(kozeptavolsag, 200, kanyar);
+    }
   }
 }
-
 
